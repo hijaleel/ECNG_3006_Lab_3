@@ -1,6 +1,6 @@
 /**
  * @file main.c
- * @brief PlatformIO Arduino MKR Zero pure-C runner for the register-level <sam.h> RTC unit test.
+ * @brief PlatformIO Arduino MKR Zero pure-C runner for RTC unit test and timing benchmark.
  *
  * Author: Jaleel Gregory
  * Student ID: 816039976
@@ -23,6 +23,7 @@ static volatile uint32_t last_written = 0UL;
 static volatile uint32_t last_read_stopped = 0UL;
 static volatile uint32_t last_read_running = 0UL;
 static volatile bool last_passed = false;
+static rtc_benchmark_report_t q3_report;
 
 static void delay_cycles(uint32_t count) {
   for (volatile uint32_t i = 0UL; i < count; i++) {
@@ -31,17 +32,19 @@ static void delay_cycles(uint32_t count) {
 }
 
 void setup(void) {
-  /* Configure onboard LED (PB08 / LED_BUILTIN) via <sam.h>. */
   PM->APBBMASK.reg |= PM_APBBMASK_PORT;
   PORT->Group[1].DIRSET.reg = PORT_PB08;
   PORT->Group[1].OUTCLR.reg = PORT_PB08;
 
   if (!init_rtc()) {
-    /* Fast blink indicates RTC initialization failure. */
     while (1) {
       PORT->Group[1].OUTTGL.reg = PORT_PB08;
       delay_cycles(400000UL);
     }
+  }
+
+  if (!rtc_run_timing_benchmark(&q3_report)) {
+    PORT->Group[1].OUTSET.reg = PORT_PB08;
   }
 }
 
@@ -56,11 +59,9 @@ void loop(void) {
   last_read_running = res.read_after_running;
   last_passed = passed;
 
-  if (passed) {
-    /* Toggle onboard LED (PB08) on each passing read/write unit-test cycle. */
+  if (passed && q3_report.valid) {
     PORT->Group[1].OUTTGL.reg = PORT_PB08;
   } else {
-    /* Hold LED steady ON if any read/write verification fails. */
     PORT->Group[1].OUTSET.reg = PORT_PB08;
   }
 
